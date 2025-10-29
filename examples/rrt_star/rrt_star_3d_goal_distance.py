@@ -15,7 +15,7 @@ OBSTACLES = np.array(
 x_init = (0, 0, 0)
 # In many soft-robot settings the configuration-space goal is unknown; we only get a
 # target pose in task space via sensing. We keep that target only for plotting.
-task_space_goal = np.array((95.0, 95.0, 95.0))
+task_space_goal = np.array((85.0, 85.0, 85.0))
 
 
 def task_space_distance(config):
@@ -26,12 +26,12 @@ def task_space_distance(config):
     return np.linalg.norm(np.asarray(config) - task_space_goal)
 
 
-q = 16
-r = 1
-max_samples = 4096
+q = 2.0  # lengths of edges to add at each step
+r = 1.0  # resolution for collision checking
+max_samples = 20 * 1024
 rewire_count = 32
-prc = 0.1
-goal_tolerance = 5.0  # Stop once we are within 5 units in task space.
+prc = 0.9
+goal_tolerance = 2.0  # Stop once we are within 2 units in task space.
 
 X = SearchSpace(X_DIMENSIONS, OBSTACLES)
 

@@ -14,7 +14,7 @@ class RRTStar(RRT):
         """
         RRT* Search
         :param X: Search Space
-        :param Q: list of lengths of edges added to tree
+        :param q: list of lengths of edges added to tree
         :param x_init: tuple, initial location
         :param x_goal: tuple, goal location
         :param max_samples: max number of samples to take
@@ -44,12 +44,31 @@ class RRTStar(RRT):
         :return: list of nearby vertices and their costs, sorted in ascending order by cost
         """
         X_near = self.nearby(tree, x_new, self.current_rewire_count(tree))
-        L_near = [(path_cost(self.trees[tree].E, x_init, x_near) + segment_cost(x_near, x_new), x_near) for
-                  x_near in X_near]
-        # noinspection PyTypeChecker
-        L_near.sort(key=itemgetter(0))
+        candidate_info = []
+        heuristic_enabled = self.goal_distance_estimator is not None or self.x_goal is not None
+        heuristic_term = None
 
-        return L_near
+        if heuristic_enabled:
+            heuristic_term = self._goal_distance(x_new)
+            if heuristic_term is None:
+                heuristic_enabled = False
+
+        for x_near in X_near:
+            path_cost_to_parent = path_cost(self.trees[tree].E, x_init, x_near)
+            edge_cost = segment_cost(x_near, x_new)
+            path_cost_to_new = path_cost_to_parent + edge_cost
+
+            if heuristic_enabled:
+                total_priority = path_cost_to_new + heuristic_term
+            else:
+                total_priority = path_cost_to_new
+
+            candidate_info.append((total_priority, path_cost_to_new, x_near))
+
+        # Prioritise by heuristic-informed score before falling back to pure path cost.
+        candidate_info.sort(key=itemgetter(0, 1))
+
+        return [(cost_to_new, vertex) for _, cost_to_new, vertex in candidate_info]
 
     def rewire(self, tree, x_new, L_near):
         """
