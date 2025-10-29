@@ -2,7 +2,8 @@ from rrt_algorithms.rrt.rrt_base import RRTBase
 
 
 class RRT(RRTBase):
-    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01, distance_fn=None):
+    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01,
+                 distance_fn=None, distance2goal_fn=None):
         """
         Template RRT planner
         :param X: Search Space
@@ -13,8 +14,10 @@ class RRT(RRTBase):
         :param r: resolution of points to sample along edge when checking for collisions
         :param prc: probability of checking whether there is a solution
         :param distance_fn: optional callable used to measure distance between vertices
+        :param distance2goal_fn: optional callable used to measure distance between a vertex and the goal
         """
-        super().__init__(X, q, x_init, x_goal, max_samples, r, prc, distance_fn)
+        super().__init__(X, q, x_init, x_goal, max_samples, r, prc,
+                         distance_fn, distance2goal_fn)
 
     def rrt_search(self):
         """

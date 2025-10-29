@@ -11,7 +11,8 @@ def my_own_distance_heuristic(a, b):
 
 
 class RRTBase(object):
-    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01, distance_fn=None):
+    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01,
+                 distance_fn=None, distance2goal_fn=None):
         """
         Template RRT planner
         :param X: Search Space
@@ -22,6 +23,7 @@ class RRTBase(object):
         :param r: resolution of points to sample along edge when checking for collisions
         :param prc: probability of checking whether there is a solution
         :param distance_fn: optional callable used to measure distance between vertices
+        :param distance2goal_fn: optional callable used to measure distance between a vertex and the goal
         """
         self.X = X
         self.samples_taken = 0
@@ -32,6 +34,7 @@ class RRTBase(object):
         self.x_init = x_init
         self.x_goal = x_goal
         self.distance_fn = distance_fn
+        self.distance2goal_fn = distance2goal_fn
         self.trees = []  # list of all trees
         self.add_tree()  # add initial tree
 
@@ -81,14 +84,23 @@ class RRTBase(object):
         :param n: int, max number of neighbors to return
         :return: list of nearby vertices
         """
-        if self.distance_fn is None:
+        use_goal_fn = self.distance2goal_fn is not None and x == self.x_goal
+
+        if self.distance_fn is None and not use_goal_fn:
             return self.trees[tree].V.nearest(x, num_results=n, objects="raw")
 
         vertices = self.trees[tree].points
-        if n is None or n <= 0:
-            return iter(sorted(vertices, key=lambda v: self.distance_fn(v, x)))
+        metric = self.distance_fn
+        if use_goal_fn:
+            metric = self.distance2goal_fn
 
-        ordered = sorted(vertices, key=lambda v: self.distance_fn(v, x))
+        if metric is None:
+            return self.trees[tree].V.nearest(x, num_results=n, objects="raw")
+
+        if n is None or n <= 0:
+            return iter(sorted(vertices, key=lambda v: metric(v, x)))
+
+        ordered = sorted(vertices, key=lambda v: metric(v, x))
         return iter(ordered[:n])
 
     def get_nearest(self, tree, x):

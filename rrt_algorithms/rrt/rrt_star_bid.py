@@ -9,7 +9,7 @@ from rrt_algorithms.rrt.rrt_star import RRTStar
 
 class RRTStarBidirectional(RRTStar):
     def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01,
-                 rewire_count=None, distance_fn=None):
+                 rewire_count=None, distance_fn=None, distance2goal_fn=None):
         """
         Bidirectional RRT* Search
         :param X: Search Space
@@ -21,9 +21,10 @@ class RRTStarBidirectional(RRTStar):
         :param prc: probability of checking whether there is a solution
         :param rewire_count: number of nearby vertices to rewire
         :param distance_fn: optional callable used to measure distance between vertices
+        :param distance2goal_fn: optional callable used to measure distance between a vertex and the goal
         """
         super().__init__(X, q, x_init, x_goal, max_samples, r, prc,
-                         rewire_count, distance_fn)
+                         rewire_count, distance_fn, distance2goal_fn)
         self.sigma_best = None  # best solution thus far
         self.c_best = float('inf')  # length of best solution thus far
         self.swapped = False
