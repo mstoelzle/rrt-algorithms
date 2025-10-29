@@ -76,20 +76,16 @@ class RRTBase(object):
         """
         self.trees[tree].E[child] = parent
 
-    def nearby(self, tree, x, n):
+    def nearby(self, tree, x, n, check_goal=False):
         """
         Return nearby vertices
         :param tree: int, tree being searched
         :param x: tuple, vertex around which searching
         :param n: int, max number of neighbors to return
+        :param check_goal: bool, wheter to check the distance from the vertices to the goal
         :return: list of nearby vertices
         """
-        use_goal_fn = self.distance2goal_fn is not None and x == self.x_goal
-
-        if self.distance_fn is None and not use_goal_fn:
-            return self.trees[tree].V.nearest(x, num_results=n, objects="raw")
-
-        vertices = self.trees[tree].points
+        use_goal_fn = self.distance2goal_fn is not None and check_goal
         metric = self.distance_fn
         if use_goal_fn:
             metric = self.distance2goal_fn
@@ -97,20 +93,22 @@ class RRTBase(object):
         if metric is None:
             return self.trees[tree].V.nearest(x, num_results=n, objects="raw")
 
+        vertices = self.trees[tree].points
         if n is None or n <= 0:
             return iter(sorted(vertices, key=lambda v: metric(v, x)))
 
         ordered = sorted(vertices, key=lambda v: metric(v, x))
         return iter(ordered[:n])
 
-    def get_nearest(self, tree, x):
+    def get_nearest(self, tree, x, check_goal=False):
         """
         Return vertex nearest to x
         :param tree: int, tree being searched
         :param x: tuple, vertex around which searching
+        :param check_goal: bool, wheter to check the distance from the vertices to the goal
         :return: tuple, nearest vertex to x
         """
-        return next(self.nearby(tree, x, 1))
+        return next(self.nearby(tree, x, 1, check_goal=check_goal))
 
     def new_and_near(self, tree, q):
         """
@@ -148,7 +146,7 @@ class RRTBase(object):
         :param tree: rtree of all Vertices
         :return: True if can be added, False otherwise
         """
-        x_nearest = self.get_nearest(tree, self.x_goal)
+        x_nearest = self.get_nearest(tree, self.x_goal, check_goal=True)
         if self.x_goal in self.trees[tree].E and x_nearest in self.trees[tree].E[self.x_goal]:
             # tree is already connected to goal using nearest vertex
             return True
@@ -175,7 +173,7 @@ class RRTBase(object):
         (does not check if this should be possible, for that use: can_connect_to_goal)
         :param tree: rtree of all Vertices
         """
-        x_nearest = self.get_nearest(tree, self.x_goal)
+        x_nearest = self.get_nearest(tree, self.x_goal, check_goal=True)
         self._register_vertex(tree, self.x_goal)
         self.trees[tree].E[self.x_goal] = x_nearest
 

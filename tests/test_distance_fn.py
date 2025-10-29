@@ -73,7 +73,7 @@ def test_goal_distance_function_only_applies_to_goal_queries():
     expected_non_goal = sorted(vertices, key=lambda v: axis_distance(v, query))
     assert non_goal_neighbors == expected_non_goal
 
-    goal_neighbors = list(rrt_custom.nearby(0, goal, len(vertices)))
+    goal_neighbors = list(rrt_custom.nearby(0, goal, len(vertices), check_goal=True))
     expected_goal = sorted(vertices, key=lambda v: goal_distance(v, goal))
     assert goal_neighbors == expected_goal
 
@@ -100,6 +100,6 @@ def test_goal_distance_without_distance_fn_preserves_default_behavior_elsewhere(
     actual_non_goal = list(rrt_goal_only.nearby(0, query, len(vertices)))
     assert actual_non_goal == expected_non_goal
 
-    goal_neighbors = list(rrt_goal_only.nearby(0, goal, len(vertices)))
+    goal_neighbors = list(rrt_goal_only.nearby(0, goal, len(vertices), check_goal=True))
     expected_goal = sorted(vertices, key=lambda v: goal_distance(v, goal))
     assert goal_neighbors == expected_goal
