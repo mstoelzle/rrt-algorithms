@@ -8,7 +8,8 @@ from rrt_algorithms.rrt.rrt_star import RRTStar
 
 
 class RRTStarBidirectional(RRTStar):
-    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01, rewire_count=None):
+    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01,
+                 rewire_count=None, distance_fn=None):
         """
         Bidirectional RRT* Search
         :param X: Search Space
@@ -19,8 +20,10 @@ class RRTStarBidirectional(RRTStar):
         :param r: resolution of points to sample along edge when checking for collisions
         :param prc: probability of checking whether there is a solution
         :param rewire_count: number of nearby vertices to rewire
+        :param distance_fn: optional callable used to measure distance between vertices
         """
-        super().__init__(X, q, x_init, x_goal, max_samples, r, prc, rewire_count)
+        super().__init__(X, q, x_init, x_goal, max_samples, r, prc,
+                         rewire_count, distance_fn)
         self.sigma_best = None  # best solution thus far
         self.c_best = float('inf')  # length of best solution thus far
         self.swapped = False
@@ -37,7 +40,7 @@ class RRTStarBidirectional(RRTStar):
         for c_near, x_near in L_near:
             c_tent = c_near + path_cost(self.trees[a].E, self.x_init, x_new)
             if c_tent < self.c_best and self.X.collision_free(x_near, x_new, self.r):
-                self.trees[b].V_count += 1
+                self._register_vertex(b, x_new)
                 self.trees[b].E[x_new] = x_near
                 self.c_best = c_tent
                 sigma_a = self.reconstruct_path(a, self.x_init, x_new)

@@ -8,7 +8,8 @@ from rrt_algorithms.utilities.geometry import dist_between_points, pairwise
 
 class RRTStarBidirectionalHeuristic(RRTStarBidirectional):
     def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01,
-                 rewire_count: int = None, conditional_rewire: bool = False):
+                 rewire_count: int = None, conditional_rewire: bool = False,
+                 distance_fn=None):
         """
         Bidirectional RRT* Search
         :param X: Search Space
@@ -21,9 +22,10 @@ class RRTStarBidirectionalHeuristic(RRTStarBidirectional):
         :param rewire_count: number of nearby vertices to rewire
         :param conditional_rewire: if True, set rewire count to 1 until solution found,
         then set to specified rewire count (ensure runtime complexity guarantees)
+        :param distance_fn: optional callable used to measure distance between vertices
         """
         super().__init__(X, q, x_init, x_goal, max_samples, r, prc,
-                         1 if conditional_rewire else rewire_count)
+                         1 if conditional_rewire else rewire_count, distance_fn)
         self.original_rewire_count = rewire_count
 
     def rrt_star_bid_h(self):

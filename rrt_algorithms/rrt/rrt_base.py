@@ -6,8 +6,12 @@ from rrt_algorithms.rrt.tree import Tree
 from rrt_algorithms.utilities.geometry import steer
 
 
+def my_own_distance_heuristic(a, b):
+    return np.linalg.norm(np.array(a) - np.array(b))
+
+
 class RRTBase(object):
-    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01):
+    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01, distance_fn=None):
         """
         Template RRT planner
         :param X: Search Space
@@ -17,6 +21,7 @@ class RRTBase(object):
         :param max_samples: max number of samples to take
         :param r: resolution of points to sample along edge when checking for collisions
         :param prc: probability of checking whether there is a solution
+        :param distance_fn: optional callable used to measure distance between vertices
         """
         self.X = X
         self.samples_taken = 0
@@ -26,6 +31,7 @@ class RRTBase(object):
         self.prc = prc
         self.x_init = x_init
         self.x_goal = x_goal
+        self.distance_fn = distance_fn
         self.trees = []  # list of all trees
         self.add_tree()  # add initial tree
 
@@ -35,15 +41,28 @@ class RRTBase(object):
         """
         self.trees.append(Tree(self.X))
 
+    def _register_vertex(self, tree, v):
+        """
+        Internal helper to register a vertex with the tree's spatial index and cache.
+        :param tree: int, tree to which to add vertex
+        :param v: tuple, vertex to add
+        :return: bool, True if vertex was newly added
+        """
+        if self.trees[tree].V.count(v) != 0:
+            return False
+        self.trees[tree].points.append(v)
+        self.trees[tree].V.insert(0, v + v, v)
+        self.trees[tree].V_count += 1
+        return True
+
     def add_vertex(self, tree, v):
         """
         Add vertex to corresponding tree
         :param tree: int, tree to which to add vertex
         :param v: tuple, vertex to add
         """
-        self.trees[tree].V.insert(0, v + v, v)
-        self.trees[tree].V_count += 1  # increment number of vertices in tree
-        self.samples_taken += 1  # increment number of samples taken
+        if self._register_vertex(tree, v):
+            self.samples_taken += 1  # increment number of samples taken
 
     def add_edge(self, tree, child, parent):
         """
@@ -62,7 +81,15 @@ class RRTBase(object):
         :param n: int, max number of neighbors to return
         :return: list of nearby vertices
         """
-        return self.trees[tree].V.nearest(x, num_results=n, objects="raw")
+        if self.distance_fn is None:
+            return self.trees[tree].V.nearest(x, num_results=n, objects="raw")
+
+        vertices = self.trees[tree].points
+        if n is None or n <= 0:
+            return iter(sorted(vertices, key=lambda v: self.distance_fn(v, x)))
+
+        ordered = sorted(vertices, key=lambda v: self.distance_fn(v, x))
+        return iter(ordered[:n])
 
     def get_nearest(self, tree, x):
         """
@@ -137,6 +164,7 @@ class RRTBase(object):
         :param tree: rtree of all Vertices
         """
         x_nearest = self.get_nearest(tree, self.x_goal)
+        self._register_vertex(tree, self.x_goal)
         self.trees[tree].E[self.x_goal] = x_nearest
 
     def reconstruct_path(self, tree, x_init, x_goal):

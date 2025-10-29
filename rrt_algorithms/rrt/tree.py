@@ -13,3 +13,4 @@ class Tree(object):
         self.V = index.Index(interleaved=True, properties=p)
         self.V_count = 0
         self.E = {}  # edges in form E[child] = parent
+        self.points = []  # cached list of vertex coordinates for custom heuristics

@@ -14,7 +14,7 @@ class Status(enum.Enum):
 
 
 class RRTConnect(RRTBase):
-    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01):
+    def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01, distance_fn=None):
         """
         Template RRTConnect planner
         :param X: Search Space
@@ -24,8 +24,9 @@ class RRTConnect(RRTBase):
         :param max_samples: max number of samples to take
         :param r: resolution of points to sample along edge when checking for collisions
         :param prc: probability of checking whether there is a solution
+        :param distance_fn: optional callable used to measure distance between vertices
         """
-        super().__init__(X, q, x_init, x_goal, max_samples, r, prc)
+        super().__init__(X, q, x_init, x_goal, max_samples, r, prc, distance_fn)
         self.swapped = False
 
     def swap_trees(self):
