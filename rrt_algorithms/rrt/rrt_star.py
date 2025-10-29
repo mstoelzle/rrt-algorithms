@@ -33,6 +33,43 @@ class RRTStar(RRT):
                          use_goal_distance=use_goal_distance)
         self.rewire_count = rewire_count if rewire_count is not None else 0
 
+    # def get_nearby_vertices(self, tree, x_init, x_new):
+    #     """
+    #     Get nearby vertices to new vertex and their associated path costs from the root of tree
+    #     as if new vertex is connected to each one separately.
+
+    #     :param tree: tree in which to search
+    #     :param x_init: starting vertex used to calculate path cost
+    #     :param x_new: vertex around which to find nearby vertices
+    #     :return: list of nearby vertices and their costs, sorted in ascending order by cost
+    #     """
+    #     X_near = self.nearby(tree, x_new, self.current_rewire_count(tree))
+    #     candidate_info = []
+    #     heuristic_enabled = self.goal_distance_estimator is not None or self.x_goal is not None
+    #     heuristic_term = None
+
+    #     if heuristic_enabled:
+    #         heuristic_term = self._goal_distance(x_new)
+    #         if heuristic_term is None:
+    #             heuristic_enabled = False
+
+    #     for x_near in X_near:
+    #         path_cost_to_parent = path_cost(self.trees[tree].E, x_init, x_near)
+    #         edge_cost = segment_cost(x_near, x_new)
+    #         path_cost_to_new = path_cost_to_parent + edge_cost
+
+    #         if heuristic_enabled:
+    #             total_priority = path_cost_to_new + heuristic_term
+    #         else:
+    #             total_priority = path_cost_to_new
+
+    #         candidate_info.append((total_priority, path_cost_to_new, x_near))
+
+    #     # Prioritise by heuristic-informed score before falling back to pure path cost.
+    #     candidate_info.sort(key=itemgetter(0, 1))
+
+    #     return [(cost_to_new, vertex) for _, cost_to_new, vertex in candidate_info]
+
     def get_nearby_vertices(self, tree, x_init, x_new):
         """
         Get nearby vertices to new vertex and their associated path costs from the root of tree
@@ -44,31 +81,12 @@ class RRTStar(RRT):
         :return: list of nearby vertices and their costs, sorted in ascending order by cost
         """
         X_near = self.nearby(tree, x_new, self.current_rewire_count(tree))
-        candidate_info = []
-        heuristic_enabled = self.goal_distance_estimator is not None or self.x_goal is not None
-        heuristic_term = None
+        L_near = [(path_cost(self.trees[tree].E, x_init, x_near) + segment_cost(x_near, x_new), x_near) for
+                  x_near in X_near]
+        # noinspection PyTypeChecker
+        L_near.sort(key=itemgetter(0))
 
-        if heuristic_enabled:
-            heuristic_term = self._goal_distance(x_new)
-            if heuristic_term is None:
-                heuristic_enabled = False
-
-        for x_near in X_near:
-            path_cost_to_parent = path_cost(self.trees[tree].E, x_init, x_near)
-            edge_cost = segment_cost(x_near, x_new)
-            path_cost_to_new = path_cost_to_parent + edge_cost
-
-            if heuristic_enabled:
-                total_priority = path_cost_to_new + heuristic_term
-            else:
-                total_priority = path_cost_to_new
-
-            candidate_info.append((total_priority, path_cost_to_new, x_near))
-
-        # Prioritise by heuristic-informed score before falling back to pure path cost.
-        candidate_info.sort(key=itemgetter(0, 1))
-
-        return [(cost_to_new, vertex) for _, cost_to_new, vertex in candidate_info]
+        return L_near
 
     def rewire(self, tree, x_new, L_near):
         """
