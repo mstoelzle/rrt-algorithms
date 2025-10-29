@@ -9,7 +9,9 @@ from rrt_algorithms.rrt.rrt_star import RRTStar
 
 class RRTStarBidirectional(RRTStar):
     def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01,
-                 rewire_count=None, distance_fn=None, distance2goal_fn=None):
+                 rewire_count=None, distance_fn=None,
+                 goal_distance_estimator=None, goal_distance_threshold=None,
+                 use_goal_distance=False):
         """
         Bidirectional RRT* Search
         :param X: Search Space
@@ -21,10 +23,18 @@ class RRTStarBidirectional(RRTStar):
         :param prc: probability of checking whether there is a solution
         :param rewire_count: number of nearby vertices to rewire
         :param distance_fn: optional callable used to measure distance between vertices
-        :param distance2goal_fn: optional callable used to measure distance between a vertex and the goal
+        :param goal_distance_estimator: unused for bidirectional variant; provided for API symmetry
+        :param goal_distance_threshold: unused for bidirectional variant; provided for API symmetry
+        :param use_goal_distance: unsupported for bidirectional planners because the goal configuration must be known
         """
+        if use_goal_distance:
+            raise ValueError("use_goal_distance is not compatible with bidirectional planners that require x_goal.")
         super().__init__(X, q, x_init, x_goal, max_samples, r, prc,
-                         rewire_count, distance_fn, distance2goal_fn)
+                         rewire_count=rewire_count,
+                         distance_fn=distance_fn,
+                         goal_distance_estimator=goal_distance_estimator,
+                         goal_distance_threshold=goal_distance_threshold,
+                         use_goal_distance=use_goal_distance)
         self.sigma_best = None  # best solution thus far
         self.c_best = float('inf')  # length of best solution thus far
         self.swapped = False

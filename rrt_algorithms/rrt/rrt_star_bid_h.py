@@ -9,7 +9,8 @@ from rrt_algorithms.utilities.geometry import dist_between_points, pairwise
 class RRTStarBidirectionalHeuristic(RRTStarBidirectional):
     def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01,
                  rewire_count: int = None, conditional_rewire: bool = False,
-                 distance_fn=None, distance2goal_fn=None):
+                 distance_fn=None, goal_distance_estimator=None,
+                 goal_distance_threshold=None, use_goal_distance=False):
         """
         Bidirectional RRT* Search
         :param X: Search Space
@@ -23,11 +24,18 @@ class RRTStarBidirectionalHeuristic(RRTStarBidirectional):
         :param conditional_rewire: if True, set rewire count to 1 until solution found,
         then set to specified rewire count (ensure runtime complexity guarantees)
         :param distance_fn: optional callable used to measure distance between vertices
-        :param distance2goal_fn: optional callable used to measure distance between a vertex and the goal
+        :param goal_distance_estimator: unused for bidirectional variant; provided for API symmetry
+        :param goal_distance_threshold: unused for bidirectional variant; provided for API symmetry
+        :param use_goal_distance: unsupported for bidirectional planners because the goal configuration must be known
         """
+        if use_goal_distance:
+            raise ValueError("use_goal_distance is not compatible with bidirectional planners that require x_goal.")
         super().__init__(X, q, x_init, x_goal, max_samples, r, prc,
-                         1 if conditional_rewire else rewire_count, distance_fn,
-                         distance2goal_fn)
+                         1 if conditional_rewire else rewire_count,
+                         distance_fn,
+                         goal_distance_estimator=goal_distance_estimator,
+                         goal_distance_threshold=goal_distance_threshold,
+                         use_goal_distance=use_goal_distance)
         self.original_rewire_count = rewire_count
 
     def rrt_star_bid_h(self):

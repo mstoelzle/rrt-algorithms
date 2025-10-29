@@ -50,56 +50,64 @@ def test_custom_distance_function_overrides_default_ordering():
     assert nearest_custom == expected
 
 
-def test_goal_distance_function_only_applies_to_goal_queries():
-    """distance2goal_fn should override distance_fn only when querying the goal."""
-    def axis_distance(a, b):
-        return abs(a[0] - b[0])
-
-    def goal_distance(a, b):
-        return abs(a[1] - b[1])
+def test_goal_distance_mode_tracks_best_candidate_and_path():
+    """use_goal_distance should record the best vertex within the supplied threshold and return its path."""
+    def goal2distance(v):
+        return abs(v[0] - 5.0)
 
     X = _build_space()
-    vertices = [(5.0, 2.0), (2.0, 5.0), (8.0, 1.0)]
-    query = (4.0, 4.0)
-    goal = (9.0, 9.0)
+    x_init = (0.0, 0.0)
+    rrt = RRTBase(X, q=1.0, x_init=x_init, x_goal=None,
+                  max_samples=50, r=1.0,
+                  goal_distance_estimator=goal2distance,
+                  goal_distance_threshold=0.2,
+                  use_goal_distance=True)
 
-    rrt_custom = RRTBase(X, q=1.0, x_init=query, x_goal=goal,
-                         max_samples=50, r=1.0,
-                         distance_fn=axis_distance,
-                         distance2goal_fn=goal_distance)
-    _seed_tree(rrt_custom, vertices)
+    rrt.add_vertex(0, x_init)
+    rrt.add_edge(0, x_init, None)
 
-    non_goal_neighbors = list(rrt_custom.nearby(0, query, len(vertices)))
-    expected_non_goal = sorted(vertices, key=lambda v: axis_distance(v, query))
-    assert non_goal_neighbors == expected_non_goal
+    edges = [((1.0, 0.0), x_init),
+             ((2.0, 0.0), (1.0, 0.0)),
+             ((4.9, 0.0), (2.0, 0.0)),
+             ((5.0, 0.0), (4.9, 0.0))]
 
-    goal_neighbors = list(rrt_custom.nearby(0, goal, len(vertices), check_goal=True))
-    expected_goal = sorted(vertices, key=lambda v: goal_distance(v, goal))
-    assert goal_neighbors == expected_goal
+    for child, parent in edges:
+        rrt.add_vertex(0, child)
+        rrt.add_edge(0, child, parent)
+
+    assert rrt.best_goal_vertex == (5.0, 0.0)
+    assert rrt.best_goal_distance == 0.0
+
+    solved, path = rrt.check_solution()
+    assert solved is True
+    assert path == [x_init, (1.0, 0.0), (2.0, 0.0), (4.9, 0.0), (5.0, 0.0)]
 
 
-def test_goal_distance_without_distance_fn_preserves_default_behavior_elsewhere():
-    """distance2goal_fn should fall back to default ordering for non-goal queries when distance_fn is absent."""
-    def goal_distance(a, b):
-        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+def test_goal_distance_mode_respects_threshold_and_max_samples():
+    """When no vertex meets the goal threshold, the planner should return None after exhausting samples."""
+    def goal2distance(v):
+        return abs(v[0] - 8.0)
 
     X = _build_space()
-    vertices = [(5.0, 5.0), (2.0, 8.0), (8.0, 2.0)]
-    query = (1.0, 1.0)
-    goal = (9.0, 9.0)
+    x_init = (0.0, 0.0)
+    rrt = RRTBase(X, q=1.0, x_init=x_init, x_goal=None,
+                  max_samples=5, r=1.0,
+                  goal_distance_estimator=goal2distance,
+                  goal_distance_threshold=0.25,
+                  use_goal_distance=True)
 
-    rrt_default = RRTBase(X, q=1.0, x_init=query, x_goal=goal,
-                          max_samples=50, r=1.0)
-    rrt_goal_only = RRTBase(X, q=1.0, x_init=query, x_goal=goal,
-                            max_samples=50, r=1.0,
-                            distance2goal_fn=goal_distance)
-    _seed_tree(rrt_default, vertices)
-    _seed_tree(rrt_goal_only, vertices)
+    rrt.add_vertex(0, x_init)
+    rrt.add_edge(0, x_init, None)
 
-    expected_non_goal = list(rrt_default.nearby(0, query, len(vertices)))
-    actual_non_goal = list(rrt_goal_only.nearby(0, query, len(vertices)))
-    assert actual_non_goal == expected_non_goal
+    # Add a vertex that does not satisfy the threshold.
+    rrt.add_vertex(0, (2.0, 0.0))
+    rrt.add_edge(0, (2.0, 0.0), x_init)
 
-    goal_neighbors = list(rrt_goal_only.nearby(0, goal, len(vertices), check_goal=True))
-    expected_goal = sorted(vertices, key=lambda v: goal_distance(v, goal))
-    assert goal_neighbors == expected_goal
+    solved, path = rrt.check_solution()
+    assert solved is False
+    assert path is None
+
+    rrt.samples_taken = rrt.max_samples
+    solved, path = rrt.check_solution()
+    assert solved is True
+    assert path is None

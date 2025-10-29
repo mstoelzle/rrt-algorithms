@@ -9,7 +9,8 @@ from rrt_algorithms.rrt.rrt import RRT
 
 class RRTStar(RRT):
     def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01, rewire_count=None,
-                 distance_fn=None, distance2goal_fn=None):
+                 distance_fn=None, goal_distance_estimator=None,
+                 goal_distance_threshold=None, use_goal_distance=False):
         """
         RRT* Search
         :param X: Search Space
@@ -21,10 +22,15 @@ class RRTStar(RRT):
         :param prc: probability of checking whether there is a solution
         :param rewire_count: number of nearby vertices to rewire
         :param distance_fn: optional callable used to measure distance between vertices
-        :param distance2goal_fn: optional callable used to measure distance between a vertex and the goal
+        :param goal_distance_estimator: optional callable mapping a vertex to a goal-distance estimate in task space
+        :param goal_distance_threshold: maximum acceptable goal-distance when use_goal_distance is True
+        :param use_goal_distance: enables goal-distance termination instead of explicit goal connection
         """
         super().__init__(X, q, x_init, x_goal, max_samples, r, prc,
-                         distance_fn, distance2goal_fn)
+                         distance_fn=distance_fn,
+                         goal_distance_estimator=goal_distance_estimator,
+                         goal_distance_threshold=goal_distance_threshold,
+                         use_goal_distance=use_goal_distance)
         self.rewire_count = rewire_count if rewire_count is not None else 0
 
     def get_nearby_vertices(self, tree, x_init, x_new):

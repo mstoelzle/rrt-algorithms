@@ -1,18 +1,19 @@
-import random
-
 import numpy as np
+import random
+from typing import Callable, Optional
 
+from rrt_algorithms.rrt.heuristics import path_cost
 from rrt_algorithms.rrt.tree import Tree
 from rrt_algorithms.utilities.geometry import steer
 
 
-def my_own_distance_heuristic(a, b):
-    return np.linalg.norm(np.array(a) - np.array(b))
-
-
 class RRTBase(object):
     def __init__(self, X, q, x_init, x_goal, max_samples, r, prc=0.01,
-                 distance_fn=None, distance2goal_fn=None):
+                 distance_fn: Optional[Callable] = None, 
+                 goal_distance_estimator: Optional[Callable] = None,
+                 goal_distance_threshold: Optional[float] = None, 
+                 use_goal_distance: bool = False
+                 ):
         """
         Template RRT planner
         :param X: Search Space
@@ -23,7 +24,9 @@ class RRTBase(object):
         :param r: resolution of points to sample along edge when checking for collisions
         :param prc: probability of checking whether there is a solution
         :param distance_fn: optional callable used to measure distance between vertices
-        :param distance2goal_fn: optional callable used to measure distance between a vertex and the goal
+        :param goal_distance_estimator: optional callable mapping a vertex to a goal-distance estimate in task space
+        :param goal_distance_threshold: maximum acceptable distance returned by goal_distance_estimator for a vertex to be considered a goal candidate
+        :param use_goal_distance: when True, terminate once a vertex falls within goal_distance_threshold instead of connecting to x_goal
         """
         self.X = X
         self.samples_taken = 0
@@ -34,7 +37,18 @@ class RRTBase(object):
         self.x_init = x_init
         self.x_goal = x_goal
         self.distance_fn = distance_fn
-        self.distance2goal_fn = distance2goal_fn
+        self.goal_distance_estimator = goal_distance_estimator
+        self.goal_distance_threshold = goal_distance_threshold
+        self.use_goal_distance = use_goal_distance
+        self.best_goal_vertex = None
+        self.best_goal_distance = None
+        self.best_goal_cost = None
+        if self.use_goal_distance:
+            if self.goal_distance_estimator is None:
+                raise ValueError("goal_distance_estimator must be provided when use_goal_distance is True.")
+            if self.goal_distance_threshold is None:
+                raise ValueError("goal_distance_threshold must be provided when use_goal_distance is True.")
+
         self.trees = []  # list of all trees
         self.add_tree()  # add initial tree
 
@@ -75,20 +89,18 @@ class RRTBase(object):
         :param parent: tuple, parent vertex
         """
         self.trees[tree].E[child] = parent
+        if self.use_goal_distance and tree == 0:
+            self._update_goal_candidate(tree, child)
 
-    def nearby(self, tree, x, n, check_goal=False):
+    def nearby(self, tree, x, n):
         """
         Return nearby vertices
         :param tree: int, tree being searched
         :param x: tuple, vertex around which searching
         :param n: int, max number of neighbors to return
-        :param check_goal: bool, wheter to check the distance from the vertices to the goal
         :return: list of nearby vertices
         """
-        use_goal_fn = self.distance2goal_fn is not None and check_goal
         metric = self.distance_fn
-        if use_goal_fn:
-            metric = self.distance2goal_fn
 
         if metric is None:
             return self.trees[tree].V.nearest(x, num_results=n, objects="raw")
@@ -100,15 +112,14 @@ class RRTBase(object):
         ordered = sorted(vertices, key=lambda v: metric(v, x))
         return iter(ordered[:n])
 
-    def get_nearest(self, tree, x, check_goal=False):
+    def get_nearest(self, tree, x):
         """
         Return vertex nearest to x
         :param tree: int, tree being searched
         :param x: tuple, vertex around which searching
-        :param check_goal: bool, wheter to check the distance from the vertices to the goal
         :return: tuple, nearest vertex to x
         """
-        return next(self.nearby(tree, x, 1, check_goal=check_goal))
+        return next(self.nearby(tree, x, 1))
 
     def new_and_near(self, tree, q):
         """
@@ -146,7 +157,9 @@ class RRTBase(object):
         :param tree: rtree of all Vertices
         :return: True if can be added, False otherwise
         """
-        x_nearest = self.get_nearest(tree, self.x_goal, check_goal=True)
+        if self.use_goal_distance:
+            return self.best_goal_vertex is not None
+        x_nearest = self.get_nearest(tree, self.x_goal)
         if self.x_goal in self.trees[tree].E and x_nearest in self.trees[tree].E[self.x_goal]:
             # tree is already connected to goal using nearest vertex
             return True
@@ -160,6 +173,12 @@ class RRTBase(object):
         Return path through tree from start to goal
         :return: path if possible, None otherwise
         """
+        if self.use_goal_distance:
+            if self.best_goal_vertex is not None:
+                print("Found a goal-distance compliant vertex, extracting path")
+                return self.reconstruct_path(0, self.x_init, self.best_goal_vertex)
+            print("Could not find a vertex within the goal-distance threshold")
+            return None
         if self.can_connect_to_goal(0):
             print("Can connect to goal")
             self.connect_to_goal(0)
@@ -173,7 +192,9 @@ class RRTBase(object):
         (does not check if this should be possible, for that use: can_connect_to_goal)
         :param tree: rtree of all Vertices
         """
-        x_nearest = self.get_nearest(tree, self.x_goal, check_goal=True)
+        if self.use_goal_distance:
+            raise RuntimeError("connect_to_goal is not valid when use_goal_distance is enabled.")
+        x_nearest = self.get_nearest(tree, self.x_goal)
         self._register_vertex(tree, self.x_goal)
         self.trees[tree].E[self.x_goal] = x_nearest
 
@@ -198,6 +219,12 @@ class RRTBase(object):
 
     def check_solution(self):
         # probabilistically check if solution found
+        if self.use_goal_distance:
+            if self.best_goal_vertex is not None:
+                return True, self.reconstruct_path(0, self.x_init, self.best_goal_vertex)
+            if self.samples_taken >= self.max_samples:
+                return True, self.get_path()
+            return False, None
         if self.prc and random.random() < self.prc:
             print("Checking if can connect to goal at", str(self.samples_taken), "samples")
             path = self.get_path()
@@ -213,3 +240,24 @@ class RRTBase(object):
         point = np.maximum(point, self.X.dimension_lengths[:, 0])
         point = np.minimum(point, self.X.dimension_lengths[:, 1])
         return tuple(point)
+
+    def _goal_distance(self, vertex):
+        if self.goal_distance_estimator is not None:
+            return self.goal_distance_estimator(vertex)
+        if self.distance_fn is not None:
+            return self.distance_fn(vertex, self.x_goal)
+        return np.linalg.norm(np.array(vertex) - np.array(self.x_goal))
+
+    def _update_goal_candidate(self, tree, vertex):
+        if self.goal_distance_estimator is None:
+            return
+        goal_distance = self._goal_distance(vertex)
+        if goal_distance is None or goal_distance > self.goal_distance_threshold:
+            return
+        cost = path_cost(self.trees[tree].E, self.x_init, vertex)
+        if (self.best_goal_vertex is None or
+                goal_distance < self.best_goal_distance or
+                (goal_distance == self.best_goal_distance and cost < self.best_goal_cost)):
+            self.best_goal_vertex = vertex
+            self.best_goal_cost = cost
+            self.best_goal_distance = goal_distance
